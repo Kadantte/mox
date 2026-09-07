@@ -45,8 +45,11 @@ import (
 //go:embed mox.service
 var moxService string
 
+//go:embed mox.freebsd.rc
+var moxFreebsdRc string
+
 func cmdQuickstart(c *cmd) {
-	c.params = "[-skipdial] [-existing-webserver] [-hostname host] user@domain [user | uid]"
+	c.params = "[-skipdial] [-existing-webserver] [-hostname host] $user@domain [$user | $uid]"
 	c.help = `Quickstart generates configuration files and prints instructions to quickly set up a mox instance.
 
 Quickstart writes configuration files, prints initial admin and account
@@ -136,8 +139,8 @@ output of "mox config describe-domains" and see the output of
 	fatalf := func(format string, args ...any) {
 		// We remove in reverse order because dirs would have been created first and must
 		// be removed last, after their files have been removed.
-		for i := len(cleanupPaths) - 1; i >= 0; i-- {
-			p := cleanupPaths[i]
+		for _, p := range slices.Backward(cleanupPaths) {
+
 			if err := os.Remove(p); err != nil {
 				log.Printf("cleaning up %q: %s", p, err)
 			}
@@ -954,11 +957,12 @@ and check the admin page for the needed DNS records.`)
 	if err := sconf.Describe(&destBuf, destsExample); err != nil {
 		fatalf("describing destination example: %v", err)
 	}
-	ndests := odests + "# If you receive email from mailing lists, you may want to configure them like the\n# example below (remove the empty/false SMTPMailRegexp and IsForward).\n# If you are receiving forwarded email, see the IsForwarded option in a Ruleset.\n"
+	var ndests strings.Builder
+	ndests.WriteString(odests + "# If you receive email from mailing lists, you may want to configure them like the\n# example below (remove the empty/false SMTPMailRegexp and IsForward).\n# If you are receiving forwarded email, see the IsForwarded option in a Ruleset.\n")
 	for _, line := range strings.Split(destBuf.String(), "\n")[1:] {
-		ndests += "#\t\t" + line + "\n"
+		ndests.WriteString("#\t\t" + line + "\n")
 	}
-	dconfstr := strings.ReplaceAll(db.String(), odests, ndests)
+	dconfstr := strings.ReplaceAll(db.String(), odests, ndests.String())
 	xwritefile(filepath.FromSlash("config/domains.conf"), []byte(dconfstr), 0660)
 
 	// Verify config.
@@ -1078,7 +1082,7 @@ You can now start the mox container.
 	}
 	fmt.Printf(`
 File ownership and permissions are automatically set correctly by mox when
-starting up. On linux, you may want to enable mox as a systemd service.
+starting up. You may want to enable mox as a service.
 
 `)
 
@@ -1098,6 +1102,19 @@ starting up. On linux, you may want to enable mox as a systemd service.
 	sudo systemctl enable $PWD/mox.service
 	sudo systemctl start mox.service
 	sudo journalctl -f -u mox.service # See logs
+`)
+	} else if runtime.GOOS == "freebsd" {
+		xwritefile("mox.freebsd.rc", []byte(moxFreebsdRc), 0555)
+		cleanupPaths = append(cleanupPaths, "mox.freebsd.rc")
+		fmt.Printf(`See mox.freebsd.rc for a FreeBSD rc file. To enable and start, run as root:
+
+	mkdir -p /usr/local/etc/rc.d/
+	cp -a mox.freebsd.rc /usr/local/etc/rc.d/mox
+	sysrc mox_workdir=$PWD # Only needed if not /home/mox
+	service mox enable
+	service mox start
+	service mox status
+	tail -f /var/log/mox.log # See logs
 `)
 	}
 

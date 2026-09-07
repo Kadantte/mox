@@ -1,4 +1,6 @@
 /* Javascript is generated from typescript, do not modify generated javascript because changes will be overwritten. */
+import {dom, style, attr, prop, ElemArg} from '../lib'
+import * as api from './api'
 
 // From HTML.
 declare let page: HTMLElement
@@ -149,7 +151,7 @@ const prewrap = (...l: string[]) => dom.span(style({whiteSpace: 'pre-wrap'}), l)
 const green = '#1dea20'
 const yellow = '#ffe400'
 const red = '#ff7443'
-const blue = '#8bc8ff'
+// const blue = '#8bc8ff'
 
 const link = (href: string, anchorOpt?: string) => dom.a(attr.href(href), attr.rel('noopener noreferrer'), anchorOpt || href)
 
@@ -477,7 +479,7 @@ const config = async () => {
 const loglevels = async () => {
 	const loglevels = await client.LogLevels()
 
-	const levels = ['error', 'info', 'warn', 'debug', 'trace', 'traceauth', 'tracedata']
+	const levels = ['error', 'warn', 'info', 'debug', 'trace', 'traceauth', 'tracedata']
 
 	let form: HTMLFormElement
 	let fieldset: HTMLFieldSetElement

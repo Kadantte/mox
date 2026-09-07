@@ -302,11 +302,11 @@ Only implemented on unix systems, not Windows.
 				return next
 			}
 
-			var cl string
+			var cl strings.Builder
 			for _, c := range changelog.Changes {
-				cl += "----\n\n" + strings.TrimSpace(c.Text) + "\n\n"
+				cl.WriteString("----\n\n" + strings.TrimSpace(c.Text) + "\n\n")
 			}
-			cl += "----"
+			cl.WriteString("----")
 
 			a, err := store.OpenAccount(log, mox.Conf.Static.Postmaster.Account, false)
 			if err != nil {
@@ -328,7 +328,7 @@ Only implemented on unix systems, not Windows.
 				Received: time.Now(),
 				Flags:    store.Flags{Flagged: true},
 			}
-			n, err := fmt.Fprintf(f, "Date: %s\r\nSubject: mox %s available\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8-bit\r\n\r\nHi!\r\n\r\nVersion %s of mox is available, this install is at %s.\r\n\r\nChanges:\r\n\r\n%s\r\n\r\nPlease report any issues at https://github.com/mjl-/mox, thanks!\r\n\r\nCheers,\r\nmox\r\n", time.Now().Format(message.RFC5322Z), latest, latest, current, strings.ReplaceAll(cl, "\n", "\r\n"))
+			n, err := fmt.Fprintf(f, "Date: %s\r\nSubject: mox %s available\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8-bit\r\n\r\nHi!\r\n\r\nVersion %s of mox is available, this install is at %s.\r\n\r\nChanges:\r\n\r\n%s\r\n\r\nPlease report any issues at https://github.com/mjl-/mox, thanks!\r\n\r\nCheers,\r\nmox\r\n", time.Now().Format(message.RFC5322Z), latest, latest, current, strings.ReplaceAll(cl.String(), "\n", "\r\n"))
 			if err != nil {
 				log.Infox("writing temporary message file for changelog delivery", err)
 				return next
@@ -337,7 +337,7 @@ Only implemented on unix systems, not Windows.
 
 			var derr error
 			a.WithWLock(func() {
-				derr = a.DeliverMailbox(log, mox.Conf.Static.Postmaster.Mailbox, &m, f)
+				derr = a.DeliverMailbox(log, mox.Conf.Static.Postmaster.Mailbox, "", &m, f)
 			})
 			if derr != nil {
 				log.Errorx("changelog delivery", derr)
@@ -499,6 +499,7 @@ func fixperms(log mlog.Log, workdir, configdir, datadir string, moxuid, moxgid u
 	//	$datadir mox:root 0750 + setgid, and recursively (but files 0640)
 	//	$workdir/mox (binary, optional) root:mox 0750
 	//	$workdir/mox.service (systemd service file, optional) root:root 0644
+	//	$workdir/mox.rc (FreeBSD service file, optional) root:root 0555
 
 	const root = 0
 	ensure(workdir, root, moxgid, 0751)
@@ -513,6 +514,10 @@ func fixperms(log mlog.Log, workdir, configdir, datadir string, moxuid, moxgid u
 	svc := filepath.Join(workdir, "mox.service")
 	if xexists(svc) {
 		ensure(svc, root, root, 0644)
+	}
+	svc = filepath.Join(workdir, "mox.rc")
+	if xexists(svc) {
+		ensure(svc, root, root, 0555)
 	}
 
 	if len(changes) == 0 {
